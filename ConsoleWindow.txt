@@ -1,0 +1,83 @@
+/*
+ * Copyright (c) 2023 Rusher Development LLC. All Rights Reserved.
+ *
+ * Unauthorized copying of this file, via any medium is strictly prohibited, proprietary, and confidential.
+ */
+
+package org.rusherhack.client.impl.feature.window.windows;
+
+import net.minecraft.network.chat.Component;
+import org.rusherhack.client.RusherHack;
+import org.rusherhack.client.api.ui.window.ResizeableWindow;
+import org.rusherhack.client.api.ui.window.content.ComboContent;
+import org.rusherhack.client.api.ui.window.content.component.ButtonComponent;
+import org.rusherhack.client.api.ui.window.content.component.TextFieldComponent;
+import org.rusherhack.client.api.ui.window.view.RichTextView;
+import org.rusherhack.client.api.ui.window.view.TabbedView;
+import org.rusherhack.client.api.ui.window.view.WindowView;
+import org.rusherhack.client.impl.events.internal.EventCommand;
+import org.rusherhack.core.event.stage.Stage;
+import org.rusherhack.core.event.subscribe.Subscribe;
+
+import java.awt.*;
+import java.util.List;
+
+/**
+ * @author John200410 11/22/2023
+ */
+public class ConsoleWindow extends ResizeableWindow {
+
+    public static ConsoleWindow INSTANCE;
+
+    //this is technically the root view but we only use this because it handles persistent content for us
+    private final TabbedView rootView;
+
+    private final RichTextView consoleLogView;
+
+    public ConsoleWindow() {
+        super("Console", 150, 100, 250, 250);
+        INSTANCE = this;
+
+        this.setMinWidth(100);
+        this.setMinHeight(100);
+
+        this.consoleLogView = new RichTextView("Log", this);
+
+        final ComboContent inputCombo = new ComboContent(this);
+
+        final TextFieldComponent commandInput = new TextFieldComponent(this, "Command Input", 100);
+        final ButtonComponent commandSubmitButton = new ButtonComponent(this, "Submit", () -> {
+            final String input = commandInput.getValue();
+            if(input.isEmpty()) {
+                return;
+            }
+
+            final EventCommand cmd = RusherHack.INSTANCE.getCommandManager().runCommand(input);
+            this.consoleLogView.add("> " + input, Color.LIGHT_GRAY.getRGB());
+            this.consoleLogView.add(Component.literal(cmd.getOutput() != null ? cmd.getOutput() : ""), Color.WHITE.getRGB());
+
+            commandInput.setValue("");
+        });
+        commandInput.setReturnCallback((str) -> commandSubmitButton.onClick());
+        inputCombo.addContent(commandInput, ComboContent.AnchorSide.LEFT);
+        inputCombo.addContent(commandSubmitButton, ComboContent.AnchorSide.RIGHT);
+
+        this.rootView = new TabbedView(this, List.of(this.consoleLogView, inputCombo));
+
+        RusherHack.EVENT_BUS.subscribe(this);
+    }
+
+    @Subscribe(stage = Stage.ALL)
+    private void onCommand(EventCommand event) {
+    }
+
+    @Override
+    public WindowView getRootView() {
+        return this.rootView;
+    }
+
+    public RichTextView getConsoleLogView() {
+        return this.consoleLogView;
+    }
+
+}

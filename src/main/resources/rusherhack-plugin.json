@@ -1,0 +1,12 @@
+{
+  "Plugin-Class": "org.tilley.ShellPlugin",
+  "Name": "${project.plugin_name}",
+  "Version": "${project.plugin_version}",
+  "Description": "See output of shell commands",
+  "Authors": [
+    "Tilley8"
+  ],
+  "Minecraft-Versions": [
+    "${project.minecraft_version}"
+  ]
+}
