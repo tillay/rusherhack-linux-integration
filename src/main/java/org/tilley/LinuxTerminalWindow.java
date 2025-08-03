@@ -18,8 +18,9 @@ public class LinuxTerminalWindow extends ResizeableWindow {
     private final TextFieldComponent inputBox;
 
     private final String username = System.getProperty("user.name");
-    private String workingDirectory = "/home/" + username + "/";
-    private final String hostname = commandOutput("hostname");
+    private final String startDirectory = System.getProperty("user.home");
+
+    String hostname = java.lang.management.ManagementFactory.getRuntimeMXBean().getName().split("@")[1];
 
     String command = null;
     String prompt = updatePrompt();
@@ -41,7 +42,7 @@ public class LinuxTerminalWindow extends ResizeableWindow {
 
     private void startShell() {
         try {
-            bashProcess = new ProcessBuilder("/bin/bash").directory(new File(workingDirectory)).redirectErrorStream(true).start();
+            bashProcess = new ProcessBuilder("/bin/bash").directory(new File(startDirectory)).redirectErrorStream(true).start();
             toShell = new BufferedWriter(new OutputStreamWriter(bashProcess.getOutputStream()));
             fromShell = new BufferedReader(new InputStreamReader(bashProcess.getInputStream()));
 
@@ -55,24 +56,13 @@ public class LinuxTerminalWindow extends ResizeableWindow {
         }
     }
 
-    private String commandOutput(String inputCommand) {
-        try {
-            Process process = new ProcessBuilder(inputCommand.split(" ")).directory(new File(workingDirectory)).start();
-            String output = new String(process.getInputStream().readAllBytes());
-            return output.isEmpty() ? "" : output.substring(0, output.length() - 1);
-        } catch (Exception e) {
-            String err = e.toString();
-            if (err.contains("Cannot run program")) return "RusherShell: "+inputCommand+": command not found";
-            return err;
-        }
-    }
-
     private void addLine(String line) {
         this.rusherShellView.add(line, Color.LIGHT_GRAY.getRGB());
     }
 
     private String updatePrompt() {
-        return "[" + username + "@" + hostname + " " + workingDirectory.replaceAll("/home/" + username, "~").replaceAll("//", "/") + " ]$ ";
+        // return "[" + username + "@" + hostname + " " + startDirectory.replaceAll("/home/" + username, "~").replaceAll("//", "/") + " ]$ ";
+        return "[" + username + "@" + hostname + "]$ ";
     }
 
     @Override
@@ -82,18 +72,6 @@ public class LinuxTerminalWindow extends ResizeableWindow {
 
             if (command.equals("clear")) {
                 rusherShellView.clear();
-
-            } else if (command.split(" ")[0].equals("cd")) {
-                String[] parts = command.split(" ");
-                addLine(prompt + command);
-                if (parts.length == 1) {
-                    workingDirectory = "/home/" + username + "/";
-                } else if (parts.length == 2 && new File(workingDirectory + "/" + parts[1]).isDirectory()) {
-                    workingDirectory = workingDirectory + "/" + parts[1];
-                    workingDirectory = commandOutput("pwd") + "/";
-                } else {
-                    addLine("cd: no such file or directory: " + parts[1]);
-                }
 
             } else {
                 addLine(prompt + command);
