@@ -9,7 +9,7 @@ import org.rusherhack.client.api.ui.window.view.TabbedView;
 import org.rusherhack.client.api.ui.window.view.WindowView;
 
 import java.awt.*;
-import java.io.File;
+import java.io.*;
 import java.util.List;
 
 public class LinuxTerminalWindow extends ResizeableWindow {
@@ -18,14 +18,15 @@ public class LinuxTerminalWindow extends ResizeableWindow {
     private final TextFieldComponent inputBox;
 
     private final String username = System.getProperty("user.name");
-
-    private String workingDirectory = "/home/"+username+"/";
-
+    private String workingDirectory = "/home/" + username + "/";
     private final String hostname = commandOutput("hostname");
 
     String command = null;
-
     String prompt = updatePrompt();
+
+    private Process bashProcess;
+    private BufferedWriter toShell;
+    private BufferedReader fromShell;
 
     public LinuxTerminalWindow() {
         super("Linux Terminal", 200, 100, 400, 300);
@@ -35,22 +36,34 @@ public class LinuxTerminalWindow extends ResizeableWindow {
         inputBox.setValue(prompt);
         inputCombo.addContent(inputBox, ComboContent.AnchorSide.LEFT);
         this.rootView = new TabbedView(this, List.of(this.rusherShellView, inputCombo));
+        startShell();
+    }
+
+    private void startShell() {
+        try {
+            bashProcess = new ProcessBuilder("/bin/bash").directory(new File(workingDirectory)).redirectErrorStream(true).start();
+            toShell = new BufferedWriter(new OutputStreamWriter(bashProcess.getOutputStream()));
+            fromShell = new BufferedReader(new InputStreamReader(bashProcess.getInputStream()));
+
+            new Thread(() -> {
+                String line;
+                try { while ((line = fromShell.readLine()) != null) { if (!line.isEmpty()) addLine(line); }
+                } catch (IOException ignored) {}
+            }).start();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private String commandOutput(String inputCommand) {
         try {
             Process process = new ProcessBuilder(inputCommand.split(" ")).directory(new File(workingDirectory)).start();
             String output = new String(process.getInputStream().readAllBytes());
-            output = output.substring(0, output.length() - 1);
-            return output;
+            return output.isEmpty() ? "" : output.substring(0, output.length() - 1);
         } catch (Exception e) {
-            if (e.toString().contains("Cannot run program")) {
-                return "RusherShell: "+inputCommand+": command not found";
-            } else if (e.toString().contains("out of bounds")) {
-                return "RusherShell: "+inputCommand+": arguments invalid";
-            } else {
-                return e.toString();
-            }
+            String err = e.toString();
+            if (err.contains("Cannot run program")) return "RusherShell: "+inputCommand+": command not found";
+            return err;
         }
     }
 
@@ -59,16 +72,15 @@ public class LinuxTerminalWindow extends ResizeableWindow {
     }
 
     private String updatePrompt() {
-        return "["+username+"@"+hostname+" "+workingDirectory.replaceAll("/home/" + username, "~").replaceAll("//", "/")+" ]$ ";
+        return "[" + username + "@" + hostname + " " + workingDirectory.replaceAll("/home/" + username, "~").replaceAll("//", "/") + " ]$ ";
     }
 
     @Override
     public boolean keyTyped(int key, int scanCode, int modifiers) {
-        if (key == GLFW.GLFW_KEY_ENTER) { // Enter pressed
-
+        if (key == GLFW.GLFW_KEY_ENTER) {
             command = inputBox.getValue().substring(prompt.length());
 
-            if (command.equals("clear")) { // Custom clearing of the screen
+            if (command.equals("clear")) {
                 rusherShellView.clear();
 
             } else if (command.split(" ")[0].equals("cd")) {
@@ -83,23 +95,30 @@ public class LinuxTerminalWindow extends ResizeableWindow {
                     addLine("cd: no such file or directory: " + parts[1]);
                 }
 
-            } else { // Attempt to run the command in the shell
+            } else {
                 addLine(prompt + command);
-                String output = commandOutput(command);
-                for (String line : output.split("\n")) addLine(line);
+                try {
+                    toShell.write(command + "\n");
+                    toShell.flush();
+                } catch (IOException ignored) {}
             }
 
             prompt = updatePrompt();
             inputBox.setValue(prompt);
             return true;
 
-        } else if (key == GLFW.GLFW_KEY_BACKSPACE) { // Only allow backspace if it won't affect the prompt
-            if (inputBox.getValue().length() <= prompt.length()) {
-                return true;
-            }
+        } else if (key == GLFW.GLFW_KEY_C && (modifiers & GLFW.GLFW_MOD_CONTROL) != 0) {
+            bashProcess.destroy();
+            addLine("^C");
+            startShell();
+            return true;
+
+        } else if (key == GLFW.GLFW_KEY_BACKSPACE) {
+            if (inputBox.getValue().length() <= prompt.length()) return true;
         } else if (key == GLFW.GLFW_KEY_UP) {
             inputBox.setValue(prompt + command);
         }
+
         return super.keyTyped(key, scanCode, modifiers);
     }
 
