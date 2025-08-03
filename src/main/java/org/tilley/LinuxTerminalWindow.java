@@ -42,7 +42,7 @@ public class LinuxTerminalWindow extends ResizeableWindow {
 
     private void startShell() {
         try {
-            bashProcess = new ProcessBuilder("/bin/bash").directory(new File(startDirectory)).redirectErrorStream(true).start();
+            bashProcess = new ProcessBuilder(System.getenv("SHELL")).directory(new File(startDirectory)).redirectErrorStream(true).start();
             toShell = new BufferedWriter(new OutputStreamWriter(bashProcess.getOutputStream()));
             fromShell = new BufferedReader(new InputStreamReader(bashProcess.getInputStream()));
 
@@ -61,8 +61,7 @@ public class LinuxTerminalWindow extends ResizeableWindow {
     }
 
     private String updatePrompt() {
-        // return "[" + username + "@" + hostname + " " + startDirectory.replaceAll("/home/" + username, "~").replaceAll("//", "/") + " ]$ ";
-        return "[" + username + "@" + hostname + "]$ ";
+        return "";
     }
 
     @Override

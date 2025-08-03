@@ -1,6 +1,7 @@
 package org.tilley;
 
 import org.rusherhack.client.api.RusherHackAPI;
+import org.rusherhack.client.api.feature.module.ToggleableModule;
 import org.rusherhack.client.api.feature.window.ResizeableWindow;
 import org.rusherhack.client.api.plugin.Plugin;
 
@@ -25,6 +26,8 @@ public class ShellPlugin extends Plugin {
 		final ResizeableWindow LinuxTerminalWindow = new LinuxTerminalWindow();
 		RusherHackAPI.getWindowManager().registerFeature(LinuxTerminalWindow);
 
+		final ToggleableModule RusherCLI = new RusherCLI();
+		RusherHackAPI.getModuleManager().registerFeature(RusherCLI);
 	}
 	
 	@Override
