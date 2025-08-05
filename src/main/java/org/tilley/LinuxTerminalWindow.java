@@ -1,5 +1,7 @@
 package org.tilley;
 
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.network.chat.Style;
 import org.lwjgl.glfw.GLFW;
 import org.rusherhack.client.api.feature.window.ResizeableWindow;
 import org.rusherhack.client.api.ui.window.content.component.TextFieldComponent;
@@ -7,10 +9,13 @@ import org.rusherhack.client.api.ui.window.content.ComboContent;
 import org.rusherhack.client.api.ui.window.view.RichTextView;
 import org.rusherhack.client.api.ui.window.view.TabbedView;
 import org.rusherhack.client.api.ui.window.view.WindowView;
+import net.minecraft.network.chat.Component;
 
 import java.awt.*;
 import java.io.*;
 import java.util.List;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class LinuxTerminalWindow extends ResizeableWindow {
     private final TabbedView rootView;
@@ -48,17 +53,68 @@ public class LinuxTerminalWindow extends ResizeableWindow {
 
             new Thread(() -> {
                 String line;
-                try { while ((line = fromShell.readLine()) != null) { if (!line.isEmpty()) addLine(line); }
+                try {
+                    while ((line = fromShell.readLine()) != null) {
+                        if (!line.isEmpty()) {
+                            addLine(line);
+                        }
+                    }
                 } catch (IOException ignored) {}
             }).start();
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
+    private record AnsiResult(Component component, Color lastColor) {}
+
+    private Color lastColor = Color.WHITE;
+
+    private static AnsiResult fromAnsi(String input, Color startColor) {
+        MutableComponent base = Component.literal("");
+        Pattern p = Pattern.compile("\u001B\\[([0-9;]*)m");
+        Matcher m = p.matcher(input);
+
+        int lastEnd = 0;
+        Color currentColor = startColor;
+
+        while (m.find()) {
+            if (m.start() > lastEnd) {
+                String text = input.substring(lastEnd, m.start());
+                base = base.append(Component.literal(text).withStyle(Style.EMPTY.withColor(currentColor.getRGB())));
+            }
+
+            String[] codes = m.group(1).split(";");
+            for (String code : codes) {
+                currentColor = switch (code) {
+                    case "30", "90" -> Color.BLACK;
+                    case "31", "91" -> Color.RED;
+                    case "32", "92" -> Color.GREEN;
+                    case "33", "93" -> Color.YELLOW;
+                    case "34", "94" -> Color.BLUE;
+                    case "35", "95" -> Color.MAGENTA;
+                    case "36", "96" -> Color.CYAN;
+                    case "37", "0" -> Color.WHITE;
+                    default -> currentColor;
+                };
+            }
+
+            lastEnd = m.end();
+        }
+
+        if (lastEnd < input.length()) {
+            base = base.append(Component.literal(input.substring(lastEnd)).withStyle(Style.EMPTY.withColor(currentColor.getRGB())));
+        }
+
+        return new AnsiResult(base, currentColor);
+    }
+
 
     private void addLine(String line) {
-        this.rusherShellView.add(line, Color.LIGHT_GRAY.getRGB());
+        AnsiResult result = fromAnsi(line, lastColor);
+        this.rusherShellView.add(result.component(), -1);
+        lastColor = result.lastColor();
     }
+
 
     private String updatePrompt() {
         return "";

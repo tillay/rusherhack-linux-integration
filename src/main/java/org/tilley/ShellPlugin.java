@@ -28,6 +28,9 @@ public class ShellPlugin extends Plugin {
 
 		final ToggleableModule RusherCLI = new RusherCLI();
 		RusherHackAPI.getModuleManager().registerFeature(RusherCLI);
+
+		final ShellCommand ShellCommand = new ShellCommand();
+		RusherHackAPI.getCommandManager().registerFeature(ShellCommand);
 	}
 	
 	@Override
